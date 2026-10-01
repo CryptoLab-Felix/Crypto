@@ -1,0 +1,3 @@
+# Large downloaded archives and generated datasets stay local.
+/raw/
+/processed/
