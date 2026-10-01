@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { loadMarket } from "./api";
 import type { Market, MarketSnapshot, Quote } from "./api";
 
+type Asset = "BTC" | "ETH";
 type IconName =
   "spot" | "futures" | "refresh" | "arrow" | "activity" | "clock" | "external";
 function Icon({
@@ -196,6 +197,10 @@ const emptyQuotes: Quote[] = [
 
 export default function App() {
   const [market, setMarket] = useState<Market>("spot");
+  const [selectedAssets, setSelectedAssets] = useState<Record<Market, Asset>>({
+    spot: "BTC",
+    futures: "BTC",
+  });
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -270,15 +275,23 @@ export default function App() {
       )
     : 0;
   const stale = Boolean(activeSnapshot && (error || age > 60));
-  const quotes = activeSnapshot?.quotes ?? emptyQuotes;
+  const selectedAsset = selectedAssets[market];
+  const selectedQuote =
+    activeSnapshot?.quotes.find((quote) => quote.asset === selectedAsset) ??
+    emptyQuotes[selectedAsset === "BTC" ? 0 : 1];
+  const selectedHasErrors = Object.keys(selectedQuote.errors).length > 0;
+  const selectedHasData =
+    selectedQuote.price !== null || selectedQuote.statistics !== null;
   const isSpot = market === "spot";
   const healthy = Boolean(
-    activeSnapshot && !error && !activeSnapshot.partial && !stale,
+    activeSnapshot && selectedHasData && !error && !selectedHasErrors && !stale,
   );
   const status = error
     ? "更新失败"
-    : activeSnapshot?.partial
-      ? "部分数据可用"
+    : selectedHasErrors
+      ? selectedHasData
+        ? "部分数据可用"
+        : "行情暂不可用"
       : stale
         ? "数据待刷新"
         : activeSnapshot
@@ -359,13 +372,38 @@ export default function App() {
               </h1>
               <p>
                 {isSpot
-                  ? "从价格到成交，掌握 BTC 与 ETH 的市场动态。"
-                  : "追踪 BTC 与 ETH 的 U 本位永续合约行情。"}
+                  ? `从价格到成交，掌握 ${selectedAsset} 的现货市场动态。`
+                  : `追踪 ${selectedAsset} 的 U 本位永续合约行情。`}
               </p>
             </div>
             <div className="market-symbol" aria-hidden="true">
               <Icon name={isSpot ? "spot" : "futures"} />
             </div>
+          </div>
+
+          <div className="asset-selector" role="group" aria-label="币种选择">
+            {(["BTC", "ETH"] as const).map((asset) => (
+              <button
+                key={asset}
+                type="button"
+                className={`asset-option ${selectedAsset === asset ? "selected" : ""}`}
+                aria-label={asset}
+                aria-pressed={selectedAsset === asset}
+                onClick={() =>
+                  setSelectedAssets((current) => ({
+                    ...current,
+                    [market]: asset,
+                  }))
+                }
+              >
+                <AssetIcon asset={asset} />
+                <span>
+                  {asset}
+                  <small>{asset === "BTC" ? "Bitcoin" : "Ethereum"}</small>
+                </span>
+                <span className="selection-dot" aria-hidden="true" />
+              </button>
+            ))}
           </div>
 
           <section className="toolbar" aria-label="行情更新控制">
@@ -374,7 +412,7 @@ export default function App() {
                 className={
                   healthy
                     ? "connected"
-                    : error || stale || activeSnapshot?.partial
+                    : error || stale || selectedHasErrors
                       ? "warning"
                       : ""
                 }
@@ -427,14 +465,13 @@ export default function App() {
             </div>
           )}
 
-          <section className="asset-grid" aria-label="币种行情">
+          <section
+            className="asset-grid"
+            aria-label={`${selectedAsset} 行情概览`}
+          >
             <AssetCard
-              quote={quotes[0]}
-              loading={loading && !activeSnapshot}
-              stale={stale}
-            />
-            <AssetCard
-              quote={quotes[1]}
+              key={selectedAsset}
+              quote={selectedQuote}
               loading={loading && !activeSnapshot}
               stale={stale}
             />
@@ -444,7 +481,7 @@ export default function App() {
             <div className="panel-heading">
               <div>
                 <span className="section-marker" />
-                <h2 id="details-title">24 小时市场数据</h2>
+                <h2 id="details-title">{selectedAsset} · 24 小时市场数据</h2>
               </div>
               <span>
                 滚动统计 <Icon name="clock" />
@@ -466,38 +503,38 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {quotes.map((quote) => (
-                    <tr key={quote.symbol}>
-                      <th scope="row">
-                        <div className="table-asset">
-                          <AssetIcon asset={quote.asset} />
-                          <span>
-                            {quote.asset}
-                            <small>/ USDT</small>
-                          </span>
-                          <span className="market-type">
-                            {isSpot ? "现货" : "永续"}
-                          </span>
-                        </div>
-                      </th>
-                      <td
-                        className={
-                          quote.statistics
-                            ? Number(quote.statistics.price_change_percent) >= 0
-                              ? "positive-text"
-                              : "negative-text"
-                            : ""
-                        }
-                      >
-                        {quote.statistics
-                          ? `${signed(quote.statistics.price_change_percent)}%`
-                          : "—"}
-                      </td>
-                      <td>{decimal(quote.statistics?.high_price)}</td>
-                      <td>{decimal(quote.statistics?.low_price)}</td>
-                      <td>{decimal(quote.statistics?.count, 0)}</td>
-                    </tr>
-                  ))}
+                  <tr key={selectedQuote.symbol}>
+                    <th scope="row">
+                      <div className="table-asset">
+                        <AssetIcon asset={selectedQuote.asset} />
+                        <span>
+                          {selectedQuote.asset}
+                          <small>/ USDT</small>
+                        </span>
+                        <span className="market-type">
+                          {isSpot ? "现货" : "永续"}
+                        </span>
+                      </div>
+                    </th>
+                    <td
+                      className={
+                        selectedQuote.statistics
+                          ? Number(
+                              selectedQuote.statistics.price_change_percent,
+                            ) >= 0
+                            ? "positive-text"
+                            : "negative-text"
+                          : ""
+                      }
+                    >
+                      {selectedQuote.statistics
+                        ? `${signed(selectedQuote.statistics.price_change_percent)}%`
+                        : "—"}
+                    </td>
+                    <td>{decimal(selectedQuote.statistics?.high_price)}</td>
+                    <td>{decimal(selectedQuote.statistics?.low_price)}</td>
+                    <td>{decimal(selectedQuote.statistics?.count, 0)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -518,8 +555,8 @@ export default function App() {
             <a
               href={
                 isSpot
-                  ? "https://www.binance.com/en/trade/BTC_USDT"
-                  : "https://www.binance.com/en/futures/BTCUSDT"
+                  ? `https://www.binance.com/en/trade/${selectedAsset}_USDT`
+                  : `https://www.binance.com/en/futures/${selectedAsset}USDT`
               }
               target="_blank"
               rel="noreferrer"

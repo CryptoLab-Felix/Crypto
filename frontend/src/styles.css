@@ -427,13 +427,75 @@ h1 > span {
   width: 14px;
   height: 14px;
 }
+.asset-selector {
+  display: inline-flex;
+  gap: 8px;
+  padding: 5px;
+  margin: -8px 0 28px;
+  border: 1px solid #2b323d;
+  border-radius: 10px;
+  background: #12171e;
+}
+.asset-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 175px;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #8793a5;
+}
+.asset-option:hover {
+  background: #1c232c;
+}
+.asset-option.selected {
+  color: #ebc273;
+  background: #29261f;
+  border-color: #50422a;
+}
+.asset-option .asset-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+}
+.asset-option .asset-icon svg {
+  width: 11px;
+  height: 19px;
+}
+.asset-option > span:not(.asset-icon):not(.selection-dot) {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.asset-option small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #8793a5;
+}
+.selection-dot {
+  width: 5px;
+  height: 5px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: transparent;
+}
+.asset-option.selected .selection-dot {
+  background: #ebc273;
+}
 .asset-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 23px;
   margin-bottom: 30px;
 }
 .asset-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 60px;
   background: linear-gradient(135deg, #191e26, #151a21 65%);
   border: 1px solid #2b323d;
   border-radius: 12px;
@@ -443,6 +505,7 @@ h1 > span {
   animation: appear 0.35s ease-out;
 }
 .asset-heading {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -512,12 +575,14 @@ h1 > span {
   border-radius: 4px;
 }
 .price-label {
+  grid-column: 1;
   font-size: 10px;
   color: #8190a4;
   letter-spacing: 1px;
   margin-bottom: 10px;
 }
 .price-line {
+  grid-column: 1;
   display: flex;
   align-items: baseline;
   gap: 9px;
@@ -538,6 +603,7 @@ h1 > span {
   letter-spacing: 0.7px;
 }
 .change-line {
+  grid-column: 1;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -587,6 +653,11 @@ h1 > span {
 .period-label {
   font-size: 9px !important;
   color: #586577 !important;
+}
+.daily-range {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  align-self: center;
 }
 .range-labels {
   display: flex;
@@ -640,6 +711,8 @@ h1 > span {
   background: #a8b7f0;
 }
 .card-statistics {
+  grid-column: 2;
+  grid-row: 4;
   margin-top: 27px;
   padding: 20px 0 24px;
   border-top: 1px solid #2b3340;
@@ -877,6 +950,7 @@ th:first-child {
   margin-left: 6px;
 }
 .partial-error {
+  grid-column: 1 / -1;
   font-size: 10px;
   line-height: 1.8;
   color: #e8bc76;
@@ -1096,6 +1170,7 @@ th:first-child {
   .asset-card {
     padding-left: 21px;
     padding-right: 21px;
+    column-gap: 30px;
   }
   .card-statistics strong {
     font-size: 13px;
@@ -1212,7 +1287,24 @@ th:first-child {
     margin-bottom: 24px;
   }
   .asset-card {
+    display: block;
     padding: 23px 24px 0;
+  }
+  .asset-selector {
+    display: flex;
+    margin: -5px 0 23px;
+    gap: 5px;
+  }
+  .asset-option {
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+    padding: 10px;
+  }
+  .asset-option > span:not(.asset-icon):not(.selection-dot) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
   }
   .asset-heading {
     margin-bottom: 26px;

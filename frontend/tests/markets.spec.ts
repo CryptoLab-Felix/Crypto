@@ -14,16 +14,16 @@ const fixture = (market: Market): MarketSnapshot => ({
     errors: {},
     statistics: {
       symbol: `${asset}USDT`,
-      last_price: "80000.12",
-      price_change: "1000.12",
-      price_change_percent: "1.25",
-      high_price: "81000",
-      low_price: "78000",
-      volume: "12000",
-      quote_volume: "960000000",
+      last_price: index === 0 ? "80000.12" : "3000.45",
+      price_change: index === 0 ? "1000.12" : "-30.45",
+      price_change_percent: index === 0 ? "1.25" : "-1.00",
+      high_price: index === 0 ? "81000" : "3100",
+      low_price: index === 0 ? "78000" : "2900",
+      volume: index === 0 ? "12000" : "24000",
+      quote_volume: index === 0 ? "960000000" : "72000000",
       open_time: 1000,
       close_time: 86401000,
-      count: 120000,
+      count: index === 0 ? 120000 : 60000,
     },
   })),
 });
@@ -39,8 +39,20 @@ test("live spot and futures, refresh, and mobile layout", async ({ page }) => {
   await expect(page.locator(".price-line strong").first()).toHaveText(
     /[\d,]+\.\d{2}/,
   );
-  await expect(page.locator(".asset-card")).toHaveCount(2);
-  await page.screenshot({ path: "../.local/spot-desktop.png", fullPage: true });
+  await expect(page.locator(".asset-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("article", { name: "BTC 行情", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  await expect(
+    page.getByRole("article", { name: "ETH 行情", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.locator("tbody")).not.toContainText("BTC");
+  await page.screenshot({
+    path: "../.local/spot-eth-desktop.png",
+    fullPage: true,
+  });
   await page.getByRole("button", { name: /合约市场/ }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "合约市场",
@@ -49,8 +61,15 @@ test("live spot and futures, refresh, and mobile layout", async ({ page }) => {
   await expect(page.locator(".price-line strong").first()).toHaveText(
     /[\d,]+\.\d{2}/,
   );
+  await expect(
+    page.getByRole("article", { name: "BTC 行情", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  await expect(
+    page.getByRole("article", { name: "ETH 行情", exact: true }),
+  ).toBeVisible();
   await page.screenshot({
-    path: "../.local/futures-desktop.png",
+    path: "../.local/futures-eth-desktop.png",
     fullPage: true,
   });
   await page.getByRole("checkbox", { name: "每 30 秒刷新" }).uncheck();
@@ -62,7 +81,17 @@ test("live spot and futures, refresh, and mobile layout", async ({ page }) => {
   await page.getByRole("button", { name: "刷新行情" }).click();
   await response;
   await expect(page.getByRole("button", { name: "刷新行情" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "ETH", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "BTC", exact: true }).click();
+  await expect(
+    page.getByRole("article", { name: "BTC 行情", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "ETH 行情", exact: true }),
+  ).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -70,10 +99,68 @@ test("live spot and futures, refresh, and mobile layout", async ({ page }) => {
   ).toBe(true);
   await expect(page.getByRole("button", { name: /现货市场/ })).toBeVisible();
   await page.screenshot({
-    path: "../.local/futures-mobile.png",
+    path: "../.local/futures-btc-mobile.png",
     fullPage: true,
   });
   expect(errors).toEqual([]);
+});
+
+test("asset selection scopes all data and links, survives refresh, and is remembered per market", async ({
+  page,
+}) => {
+  for (const market of ["spot", "futures"] as const) {
+    await page.route(`**/api/markets/${market}`, (route) =>
+      route.fulfill({ json: fixture(market) }),
+    );
+  }
+  await page.goto("/");
+  await expect(page.locator(".price-line strong")).toHaveText("80,000.12");
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  await expect(page.locator(".asset-card")).toHaveCount(1);
+  await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
+  await expect(page.locator(".change-pill")).toContainText("-1.00%");
+  await expect(page.locator(".card-statistics")).toContainText("2.40 万 ETH");
+  await expect(page.locator(".card-statistics")).toContainText(
+    "7,200.00 万 USDT",
+  );
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.locator("tbody")).toContainText("3,100.00");
+  await expect(page.locator("tbody")).toContainText("2,900.00");
+  await expect(page.locator("tbody")).toContainText("60,000");
+  await expect(page.locator("tbody")).not.toContainText("BTC");
+  await expect(page.getByRole("link", { name: "在币安查看" })).toHaveAttribute(
+    "href",
+    "https://www.binance.com/en/trade/ETH_USDT",
+  );
+  const refreshResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/markets/spot"),
+  );
+  await page.getByRole("button", { name: "刷新行情" }).click();
+  await refreshResponse;
+  await expect(page.getByRole("button", { name: "刷新行情" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "ETH", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
+  await page.getByRole("button", { name: /合约市场/ }).click();
+  await expect(
+    page.getByRole("button", { name: "BTC", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
+  await expect(page.getByRole("link", { name: "在币安查看" })).toHaveAttribute(
+    "href",
+    "https://www.binance.com/en/futures/ETHUSDT",
+  );
+  const btcButton = page.getByRole("button", { name: "BTC", exact: true });
+  await btcButton.focus();
+  await btcButton.press("Space");
+  await expect(page.locator(".price-line strong")).toHaveText("80,000.12");
+  await page.getByRole("button", { name: /现货市场/ }).click();
+  await expect(
+    page.getByRole("button", { name: "ETH", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
 });
 
 test("initial error can be retried, refresh error preserves visibly stale data", async ({
@@ -119,9 +206,10 @@ test("partial API failure is shown without substituting statistics for latest pr
   await expect(page.getByText("部分数据可用", { exact: true })).toBeVisible();
   await expect(page.locator(".price-line strong").first()).toHaveText("—");
   await expect(page.locator(".partial-error")).toContainText("超时");
-  await expect(page.locator(".price-line strong").nth(1)).toHaveText(
-    "3,000.45",
-  );
+  await page.getByRole("button", { name: "ETH", exact: true }).click();
+  await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
+  await expect(page.getByText("行情已连接", { exact: true })).toBeVisible();
+  await expect(page.locator(".partial-error")).toHaveCount(0);
 });
 
 test("switching market ignores delayed responses from the previous module", async ({
