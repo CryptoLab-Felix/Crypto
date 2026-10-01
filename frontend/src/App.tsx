@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadMarket } from "./api";
-import type { Market, MarketSnapshot, Quote } from "./api";
+import { loadMarket, MarketRequestError } from "./api";
+import type { Market, MarketSnapshot, Quote, RestCooldown } from "./api";
+import EthOrderBook from "./EthOrderBook";
+import RestCooldownNotice from "./RestCooldownNotice";
 
 type Asset = "BTC" | "ETH";
 type IconName =
@@ -208,9 +210,25 @@ export default function App() {
   const [tick, setTick] = useState(Date.now());
   const controller = useRef<AbortController | null>(null);
   const sequence = useRef(0);
+  const [futuresCooldown, setFuturesCooldown] = useState<RestCooldown | null>(null);
+  const cooldownRef = useRef<RestCooldown | null>(null);
+  const updateCooldown = useCallback((cooldown: RestCooldown | null | undefined) => {
+    const previous = cooldownRef.current;
+    if (cooldown && (cooldown.retry_at > (previous?.retry_at ?? 0) ||
+      (cooldown.retry_at === previous?.retry_at && cooldown.http_status === 418 && previous.http_status !== 418))) {
+      cooldownRef.current = cooldown;
+      setFuturesCooldown(cooldown);
+      setTick(Date.now());
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     controller.current?.abort();
+    if (market === "futures" && (cooldownRef.current?.retry_at ?? 0) > Date.now()) {
+      ++sequence.current;
+      setLoading(false);
+      return;
+    }
     const request = new AbortController();
     controller.current = request;
     const requestNumber = ++sequence.current;
@@ -219,6 +237,7 @@ export default function App() {
     try {
       const next = await loadMarket(market, request.signal);
       if (requestNumber === sequence.current && !request.signal.aborted) {
+        if (market === "futures") updateCooldown(next.rest_cooldown);
         setSnapshot(next);
         setError(null);
         setTick(Date.now());
@@ -228,6 +247,7 @@ export default function App() {
         requestNumber === sequence.current &&
         (!request.signal.aborted || request.signal.reason === "timeout")
       ) {
+        if (market === "futures" && cause instanceof MarketRequestError) updateCooldown(cause.restCooldown);
         setError(
           request.signal.reason === "timeout"
             ? "行情加载超时，请点击刷新重试。"
@@ -240,7 +260,7 @@ export default function App() {
       window.clearTimeout(timeout);
       if (requestNumber === sequence.current) setLoading(false);
     }
-  }, [market]);
+  }, [market, updateCooldown]);
 
   useEffect(() => {
     setSnapshot(null);
@@ -261,7 +281,7 @@ export default function App() {
   }, [autoRefresh, refresh]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setTick(Date.now()), 5_000);
+    const interval = window.setInterval(() => setTick(Date.now()), 1_000);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -274,7 +294,8 @@ export default function App() {
         ),
       )
     : 0;
-  const stale = Boolean(activeSnapshot && (error || age > 60));
+  const restPaused = market === "futures" && (futuresCooldown?.retry_at ?? 0) > tick;
+  const stale = Boolean(activeSnapshot && (error || age > 60 || restPaused));
   const selectedAsset = selectedAssets[market];
   const selectedQuote =
     activeSnapshot?.quotes.find((quote) => quote.asset === selectedAsset) ??
@@ -283,10 +304,11 @@ export default function App() {
   const selectedHasData =
     selectedQuote.price !== null || selectedQuote.statistics !== null;
   const isSpot = market === "spot";
+  const showEthBook = !isSpot && selectedAsset === "ETH";
   const healthy = Boolean(
     activeSnapshot && selectedHasData && !error && !selectedHasErrors && !stale,
   );
-  const status = error
+  const status = restPaused ? "查询已暂停" : error
     ? "更新失败"
     : selectedHasErrors
       ? selectedHasData
@@ -417,12 +439,12 @@ export default function App() {
                       : ""
                 }
               />
-              <span>{status}</span>
+              <span>{showEthBook ? `24h 统计 · ${status}` : status}</span>
               <span className="toolbar-separator" />
               <small>
                 {activeSnapshot
                   ? `更新于 ${clockTime(activeSnapshot.fetched_at)}`
-                  : "正在获取最新数据"}
+                  : restPaused ? "等待恢复查询" : "正在获取最新数据"}
               </small>
             </div>
             <div className="refresh-controls">
@@ -432,12 +454,12 @@ export default function App() {
                   checked={autoRefresh}
                   onChange={(event) => setAutoRefresh(event.target.checked)}
                 />
-                <span className="toggle" />每 30 秒刷新
+                <span className="toggle" />{showEthBook ? "24h 统计每 30 秒刷新" : "每 30 秒刷新"}
               </label>
               <button
                 className="refresh-button"
                 onClick={() => void refresh()}
-                disabled={loading}
+                disabled={loading || restPaused}
               >
                 <Icon name="refresh" className={loading ? "spin" : ""} />
                 {loading ? "更新中" : "刷新行情"}
@@ -445,13 +467,15 @@ export default function App() {
             </div>
           </section>
 
-          {error && (
+          {restPaused && futuresCooldown && <RestCooldownNotice cooldown={futuresCooldown} now={tick} />}
+
+          {error && !restPaused && (
             <div className="error-banner" role="alert">
               <div>
-                <strong>暂时无法更新行情</strong>
+                <strong>{showEthBook ? "暂时无法更新 24h 统计" : "暂时无法更新行情"}</strong>
                 <p>
                   {error}
-                  {activeSnapshot ? " 下方保留上次获取的数据。" : ""}
+                  {activeSnapshot ? (showEthBook ? " 统计表保留上次获取的数据。" : " 下方保留上次获取的数据。") : ""}
                 </p>
               </div>
               <button onClick={() => void refresh()} disabled={loading}>
@@ -459,13 +483,13 @@ export default function App() {
               </button>
             </div>
           )}
-          {stale && !error && (
+          {stale && !error && !restPaused && (
             <div className="stale-banner" role="status">
-              当前显示的是 {age} 秒前的数据，点击“刷新行情”获取最新价格。
+                {showEthBook ? `当前 24h 统计为 ${age} 秒前的数据，点击“刷新行情”更新统计。` : `当前显示的是 ${age} 秒前的数据，点击“刷新行情”获取最新价格。`}
             </div>
           )}
 
-          <section
+          {showEthBook ? <EthOrderBook onCooldown={updateCooldown} /> : <section
             className="asset-grid"
             aria-label={`${selectedAsset} 行情概览`}
           >
@@ -475,7 +499,7 @@ export default function App() {
               loading={loading && !activeSnapshot}
               stale={stale}
             />
-          </section>
+          </section>}
 
           <section className="details-panel" aria-labelledby="details-title">
             <div className="panel-heading">
@@ -500,6 +524,8 @@ export default function App() {
                       24h 最低价 <small>USDT</small>
                     </th>
                     <th scope="col">成交笔数</th>
+                    {showEthBook && <th scope="col">24h 成交量 <small>ETH</small></th>}
+                    {showEthBook && <th scope="col">24h 成交额 <small>USDT</small></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -534,6 +560,8 @@ export default function App() {
                     <td>{decimal(selectedQuote.statistics?.high_price)}</td>
                     <td>{decimal(selectedQuote.statistics?.low_price)}</td>
                     <td>{decimal(selectedQuote.statistics?.count, 0)}</td>
+                    {showEthBook && <td>{compact(selectedQuote.statistics?.volume)}</td>}
+                    {showEthBook && <td>{compact(selectedQuote.statistics?.quote_volume)}</td>}
                   </tr>
                 </tbody>
               </table>

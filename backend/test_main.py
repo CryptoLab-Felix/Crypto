@@ -6,6 +6,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from backend.main import app
+from backend.binance_rest import FuturesRestGate
 
 
 def ticker(symbol):
@@ -22,6 +23,7 @@ class MarketApiTests(unittest.TestCase):
         with TestClient(app) as client:
             upstream = httpx.AsyncClient(transport=httpx.MockTransport(handler))
             app.state.binance_client = upstream
+            app.state.futures_rest = FuturesRestGate()
             try:
                 return client.get(f"/api/markets/{market}")
             finally:
@@ -96,6 +98,37 @@ class MarketApiTests(unittest.TestCase):
             self.fail("Invalid market must not reach Binance")
 
         self.assertEqual(self.request("invalid", handler).status_code, 422)
+
+    def test_futures_limit_pauses_subsequent_refreshes_but_not_spot(self):
+        requests = []
+
+        def handler(request):
+            requests.append(request.url.host)
+            if request.url.host == "fapi.binance.com":
+                return httpx.Response(418, headers={"Retry-After": "3600"})
+            symbol = request.url.params["symbol"]
+            payload = ticker(symbol) if request.url.path.endswith("24hr") else {"symbol": symbol, "price": "2000"}
+            return httpx.Response(200, json=payload)
+
+        with TestClient(app) as client:
+            upstream = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+            app.state.binance_client = upstream
+            app.state.futures_rest = FuturesRestGate()
+            try:
+                first = client.get("/api/markets/futures")
+                self.assertEqual(first.status_code, 429)
+                self.assertEqual(first.json()["detail"]["rest_cooldown"]["http_status"], 418)
+                self.assertGreaterEqual(int(first.headers["Retry-After"]), 3599)
+                before = len(requests)
+                for _ in range(3):
+                    response = client.get("/api/markets/futures")
+                    self.assertEqual(response.status_code, 429)
+                    self.assertEqual(response.json()["detail"]["rest_cooldown"], first.json()["detail"]["rest_cooldown"])
+                self.assertEqual(len(requests), before)
+                self.assertEqual(client.get("/api/markets/spot").status_code, 200)
+                self.assertEqual(requests.count("data-api.binance.vision"), 4)
+            finally:
+                client.portal.call(upstream.aclose)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,67 @@
+.eth-orderbook {
+  margin-bottom: 30px;
+  border: 1px solid #303a49;
+  border-radius: 12px;
+  background: #151a22;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+.depth-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 28px 20px; }
+.depth-eyebrow { color: #94a4bc; font-size: 10px; letter-spacing: 1.5px; }
+.depth-heading h2 { margin: 8px 0 0; font-size: 20px; font-weight: 600; }
+.depth-status { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+.depth-status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.depth-status.live { color: #6ad0a9; }
+.depth-status.waiting, .depth-warning { color: #e6bd71; }
+.depth-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 14px 28px; background: #11161e; border-block: 1px solid #28313e; font-size: 11px; }
+.depth-speed { color: #9ab3eb; margin-right: auto; }
+.depth-controls label { display: flex; align-items: center; gap: 8px; color: #9ba8bb; }
+.depth-controls select { font: inherit; color: #dee5f0; background: #202936; border: 1px solid #3a4658; border-radius: 5px; padding: 6px; }
+.depth-reconnect { background: transparent; border: 1px solid #465369; border-radius: 5px; font-size: 11px; padding: 7px 10px; }
+.depth-reconnect:hover { background: #273244; }
+.depth-side-label { padding: 17px 28px 10px; display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.depth-side-label span { color: #92a0b4; font-size: 10px; }
+.asks .depth-level-price, .depth-side-label.asks { color: #ef939f; }
+.bids .depth-level-price, .depth-side-label.bids { color: #6ad0a9; }
+.depth-columns, .depth-row { display: grid; grid-template-columns: 1.45fr 1fr 1fr 1.1fr; gap: 14px; padding: 0 28px; align-items: center; }
+.depth-columns { min-height: 32px; color: #8494ab; font-size: 10px; }
+.depth-row { position: relative; min-height: 28px; font-size: 12px; }
+.depth-row:hover { background: #ffffff06; }
+.depth-columns > span:not(:first-child), .depth-row > span[role="cell"]:not(.depth-level-price) { text-align: right; }
+.depth-row > span[role="cell"] { position: relative; z-index: 1; }
+.depth-fill { position: absolute; right: 0; height: calc(100% - 2px); pointer-events: none; }
+.asks .depth-fill { background: #e8758612; border-right: 2px solid #e8758640; }
+.bids .depth-fill { background: #56c39b12; border-right: 2px solid #56c39b40; }
+.depth-empty { color: #8190a4; padding: 36px 28px; text-align: center; }
+.depth-current { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 12px; padding: 22px 28px; background: linear-gradient(100deg, #222a39, #192130); border-block: 1px solid #344055; }
+.depth-current .price-label { margin-bottom: 3px; color: #a3b2c8; }
+.depth-current .price-line strong { color: #e7efff; font-size: 36px; }
+.depth-price-time { display: block; color: #94a4bb; font-size: 10px; margin-top: 7px; }
+.depth-spread { display: grid; text-align: right; gap: 8px; color: #94a4bb; font-size: 10px; }
+.depth-spread b { color: #dbe4f3; font-size: 17px; font-weight: 500; }
+.depth-spread small { font-size: 10px; color: #94a4bb; }
+.depth-stale .depth-rows { opacity: 0.5; }
+.depth-notes { margin-top: 18px; padding: 12px 28px; border-top: 1px solid #293240; color: #8c9bb0; font-size: 10px; line-height: 1.8; }
+.depth-notes p { margin: 5px 0; }
+.rest-cooldown { margin-bottom: 20px; padding: 16px 20px; border: 1px solid #67512e; border-radius: 8px; background: #282319; color: #e8c78d; font-size: 12px; line-height: 1.8; }
+.rest-cooldown p { margin: 4px 0 0; }
+.rest-cooldown p:last-child { color: #b8aa92; font-size: 11px; }
+@media (max-width: 640px) {
+  .depth-heading { padding: 19px 16px; align-items: flex-start; flex-direction: column; gap: 12px; }
+  .depth-heading h2 { font-size: 18px; }
+  .depth-controls { padding: 12px 16px; gap: 12px; }
+  .depth-speed { flex-basis: 100%; }
+  .depth-controls label { font-size: 10px; gap: 5px; }
+  .depth-columns, .depth-row { grid-template-columns: 1.35fr 1fr 1fr; gap: 8px; padding-inline: 12px; }
+  .depth-columns { font-size: 8px; }
+  .depth-row { min-height: 29px; font-size: 10px; }
+  .depth-notional { display: none; }
+  .depth-side-label { padding-inline: 16px; }
+  .depth-current { padding: 18px 16px; }
+  .depth-current .price-line strong { font-size: 28px; }
+  .depth-current .price-line { gap: 5px; }
+  .depth-current .price-line > span { font-size: 9px; }
+  .depth-spread { font-size: 9px; }
+  .depth-price-time { font-size: 9px; }
+  .depth-notes { padding-inline: 16px; }
+}
