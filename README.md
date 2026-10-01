@@ -61,6 +61,10 @@ Windows 浏览器验证默认使用已安装的 Chrome；可通过 `PLAYWRIGHT_C
 
 构建完成后重新启动 Python 后端，它会同时提供 `frontend/dist` 静态页面和 API，此时可访问 <http://127.0.0.1:8000>。这是本地运行配置，尚未配置公网部署。
 
+## 历史成交数据
+
+官方历史逐笔成交数据按市场、交易对和日期保存在 `data/`，支持下载并校验 U 本位合约的每日成交文件。目录约定、字段和追加下载方式见 [历史数据说明](data/README.md)。原始 ZIP 与整理后的 CSV 仅保存在本地，不进入 Git。
+
 ## API 调研文档
 
 - [币安现货 REST API 清单](BINANCE_SPOT_REST_API.md)
