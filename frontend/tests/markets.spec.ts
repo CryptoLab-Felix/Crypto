@@ -28,7 +28,7 @@ const fixture = (market: Market): MarketSnapshot => ({
   })),
 });
 
-test("live spot and futures, refresh, and mobile layout", async ({ page }) => {
+test("live spot and futures, refresh, and mobile layout", { tag: "@live" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
