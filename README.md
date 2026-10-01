@@ -47,6 +47,23 @@ Python 3 + TypeScript Web 行情原型，展示币安 BTC、ETH 的现货和 U �
 
 ## Windows 本地运行
 
+已安装依赖和 GNU Make 后，在项目根目录的 PowerShell 终端执行：
+
+```powershell
+cd ~/Crypto
+make dev-gui
+```
+
+`~/Crypto` 应为项目目录（也可以是指向项目实际位置的目录联接）；如果项目在其他位置，进入实际目录后执行同一命令即可。`make dev-gui` 会在后台启动前后端，等待服务就绪后自动打开浏览器；日志保存在 `.local`。停止服务执行 `make stop-dev`。两个服务的默认端口为 8000、5173，如已启动本项目，先停止再重新启动。
+
+首次配置时可通过 WinGet 安装 GNU Make，随后重新打开终端并确认 `make --version` 可用：
+
+```powershell
+winget install --id ezwinports.make --exact --source winget --scope user
+```
+
+不使用 Make 也可直接执行下面的 PowerShell 启动脚本。
+
 需要 Python 3.11 或更新版本，以及 Node.js 22.12+（本次开发使用 Python 3.11 和 Node.js 24）。在仓库根目录执行：
 
 ```powershell

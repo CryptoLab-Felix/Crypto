@@ -1,3 +1,5 @@
+﻿param([switch]$OpenBrowser)
+
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $runtimePath = Join-Path $projectRoot '.local'
@@ -33,7 +35,7 @@ $deadline = [DateTime]::UtcNow.AddSeconds(25)
 while ([DateTime]::UtcNow -lt $deadline) {
     try {
         $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/health' -TimeoutSec 2
-        $page = Invoke-WebRequest -Uri 'http://127.0.0.1:5173' -TimeoutSec 2
+        $page = Invoke-WebRequest -Uri 'http://127.0.0.1:5173' -UseBasicParsing -TimeoutSec 2
         if ($health.status -eq 'ok' -and $page.StatusCode -eq 200) { $ready = $true; break }
     } catch { Start-Sleep -Milliseconds 300 }
 }
@@ -45,3 +47,7 @@ if (-not $ready) {
 Write-Output 'Web: http://127.0.0.1:5173'
 Write-Output 'API: http://127.0.0.1:8000/docs'
 Write-Output '日志位于 .local；停止服务请运行 scripts\stop.ps1。'
+
+if ($OpenBrowser) {
+    Start-Process 'http://127.0.0.1:5173'
+}
