@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $processFile = Join-Path $projectRoot '.local\processes.json'
 if (-not (Test-Path -LiteralPath $processFile)) { Write-Output '没有记录中的开发进程。'; exit 0 }
