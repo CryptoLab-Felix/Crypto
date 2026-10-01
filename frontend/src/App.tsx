@@ -198,10 +198,10 @@ const emptyQuotes: Quote[] = [
 ];
 
 export default function App() {
-  const [market, setMarket] = useState<Market>("spot");
+  const [market, setMarket] = useState<Market>("futures");
   const [selectedAssets, setSelectedAssets] = useState<Record<Market, Asset>>({
     spot: "BTC",
-    futures: "BTC",
+    futures: "ETH",
   });
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [loading, setLoading] = useState(true);

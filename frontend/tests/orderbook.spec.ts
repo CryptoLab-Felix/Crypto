@@ -6,8 +6,6 @@ async function openEth(page: import("@playwright/test").Page) {
   await page.route("**/api/markets/spot", (route) => route.fulfill({ status: 502, json: {} }));
   await page.route("**/api/markets/futures", (route) => route.fulfill({ status: 502, json: {} }));
   await page.goto("/");
-  await page.getByRole("button", { name: /合约市场/ }).click();
-  await page.getByRole("button", { name: "ETH", exact: true }).click();
 }
 
 test("ETH depth groups prices, accumulates outward, and applies live updates", async ({ page }) => {
@@ -129,10 +127,8 @@ test("REST error exposes its cooldown before the book connects", async ({ page }
     status: 429, json: { detail: { message: cooldown.message, rest_cooldown: cooldown } },
   }));
   await page.goto("/");
-  await page.getByRole("button", { name: /合约市场/ }).click();
   await expect(page.locator(".rest-cooldown")).toContainText("币安请求频率受限");
   await expect(page.getByRole("button", { name: "刷新行情", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "ETH", exact: true }).click();
   await expect.poll(() => mock.active.size).toBeGreaterThan(0);
   mock.send({ asks: [], bids: [], book_status: "reconnecting", rest_cooldown: cooldown });
   await expect(page.getByText("盘口同步等待解除限制", { exact: true })).toBeVisible();

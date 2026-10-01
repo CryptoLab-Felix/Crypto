@@ -3,7 +3,14 @@ import type { Market, MarketSnapshot } from "../src/api";
 import { bookFixture, mockEthStream } from "./eth-stream-fixture";
 
 test.beforeEach(async ({ page }, info) => {
-  if (!info.tags.includes("@live")) await mockEthStream(page, bookFixture("3000.45"));
+  if (!info.tags.includes("@live")) {
+    await mockEthStream(page, bookFixture("3000.45"));
+    for (const market of ["spot", "futures"] as const) {
+      await page.route(`**/api/markets/${market}`, (route) =>
+        route.fulfill({ json: fixture(market) }),
+      );
+    }
+  }
 });
 
 const fixture = (market: Market): MarketSnapshot => ({
@@ -37,6 +44,10 @@ test("live spot and futures, refresh, and mobile layout", { tag: "@live" }, asyn
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("合约市场");
+  await expect(page.getByRole("button", { name: "ETH", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("盘口实时连接", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /现货市场/ }).click();
   await expect(page.getByText("行情已连接", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "现货市场",
@@ -62,6 +73,8 @@ test("live spot and futures, refresh, and mobile layout", { tag: "@live" }, asyn
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "合约市场",
   );
+  await expect(page.getByRole("button", { name: "ETH", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "BTC", exact: true }).click();
   await expect(page.getByText("行情已连接", { exact: true })).toBeVisible();
   await expect(page.locator(".price-line strong").first()).toHaveText(
     /[\d,]+\.\d{2}/,
@@ -112,15 +125,22 @@ test("live spot and futures, refresh, and mobile layout", { tag: "@live" }, asyn
   expect(errors).toEqual([]);
 });
 
-test("asset selection scopes all data and links, survives refresh, and is remembered per market", async ({
+test("homepage defaults to ETH futures; asset selection scopes data and is remembered per market", async ({
   page,
 }) => {
-  for (const market of ["spot", "futures"] as const) {
-    await page.route(`**/api/markets/${market}`, (route) =>
-      route.fulfill({ json: fixture(market) }),
-    );
-  }
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("合约市场");
+  await expect(page.getByRole("button", { name: /合约市场/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "ETH", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("eth-live-price")).toHaveText("3,000.45");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.locator("tbody")).toContainText("ETH");
+  await expect(page.locator("tbody")).not.toContainText("BTC");
+  await expect(page.getByRole("link", { name: "在币安查看" })).toHaveAttribute(
+    "href",
+    "https://www.binance.com/en/futures/ETHUSDT",
+  );
+  await page.getByRole("button", { name: /现货市场/ }).click();
   await expect(page.locator(".price-line strong")).toHaveText("80,000.12");
   await page.getByRole("button", { name: "ETH", exact: true }).click();
   await expect(page.locator(".asset-card")).toHaveCount(1);
@@ -151,10 +171,9 @@ test("asset selection scopes all data and links, survives refresh, and is rememb
   await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
   await page.getByRole("button", { name: /合约市场/ }).click();
   await expect(
-    page.getByRole("button", { name: "BTC", exact: true }),
+    page.getByRole("button", { name: "ETH", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "ETH", exact: true }).click();
-  await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
+  await expect(page.getByTestId("eth-live-price")).toHaveText("3,000.45");
   await expect(page.getByRole("link", { name: "在币安查看" })).toHaveAttribute(
     "href",
     "https://www.binance.com/en/futures/ETHUSDT",
@@ -168,6 +187,10 @@ test("asset selection scopes all data and links, survives refresh, and is rememb
     page.getByRole("button", { name: "ETH", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".price-line strong")).toHaveText("3,000.45");
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("合约市场");
+  await expect(page.getByRole("button", { name: "ETH", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("eth-live-price")).toHaveText("3,000.45");
 });
 
 test("initial error can be retried, refresh error preserves visibly stale data", async ({
@@ -183,6 +206,7 @@ test("initial error can be retried, refresh error preserves visibly stale data",
     }),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: /现货市场/ }).click();
   await expect(page.getByRole("alert")).toContainText("测试：行情暂时不可用。");
   await expect(page.locator(".price-line strong").first()).toHaveText("—");
   fail = false;
@@ -210,6 +234,7 @@ test("partial API failure is shown without substituting statistics for latest pr
     route.fulfill({ json: snapshot }),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: /现货市场/ }).click();
   await expect(page.getByText("部分数据可用", { exact: true })).toBeVisible();
   await expect(page.locator(".price-line strong").first()).toHaveText("—");
   await expect(page.locator(".partial-error")).toContainText("超时");
@@ -222,25 +247,20 @@ test("partial API failure is shown without substituting statistics for latest pr
 test("switching market ignores delayed responses from the previous module", async ({
   page,
 }) => {
-  await page.route("**/api/markets/spot", async (route) => {
+  await page.route("**/api/markets/futures", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1200));
-    await route.fulfill({ json: fixture("spot") }).catch(() => {});
+    await route.fulfill({ json: fixture("futures") }).catch(() => {});
   });
-  const futures = fixture("futures");
-  futures.quotes[0].price = "81000.99";
-  await page.route("**/api/markets/futures", (route) =>
-    route.fulfill({ json: futures }),
-  );
   await page.goto("/");
-  await page.getByRole("button", { name: /合约市场/ }).click();
+  await page.getByRole("button", { name: /现货市场/ }).click();
   await expect(page.locator(".price-line strong").first()).toHaveText(
-    "81,000.99",
+    "80,000.12",
   );
   await page.waitForTimeout(1500);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "合约市场",
+    "现货市场",
   );
   await expect(page.locator(".price-line strong").first()).toHaveText(
-    "81,000.99",
+    "80,000.12",
   );
 });
