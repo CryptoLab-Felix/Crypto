@@ -8,6 +8,7 @@ Python 3 + TypeScript Web 行情原型，展示币安 BTC、ETH 的现货和 U �
 - 最新成交价、24 小时涨跌、最高／最低价、成交量、成交额和成交笔数。
 - 手动刷新、每 30 秒自动刷新、数据更新时间及失败／部分成功提示；后台标签页暂停轮询。
 - ETH U 本位永续增加实时盘口：卖盘、最新成交价、买盘依次排列，支持原始价位或 0.1／1／5／10 USDT 分组，每侧显示 10／20／50 档，展示挂单量、累计量及名义金额。
+- ETH 合约页面增加 CoinBoss 强平估算盘口：上方为空头潜在强平买入，下方为多头潜在强平卖出，中间共用币安实时成交价；展示每档预估名义金额及累计金额，不再乘杠杆。
 - 桌面与手机布局；没有演示行情回退，页面数值来自真实公开 API。
 
 前端使用 React + TypeScript + Vite，后端使用 Python 3 + FastAPI + httpx。无需币安 API Key。当前仅展示行情，MACD、RSI 和交易操作尚未实现。
@@ -44,6 +45,22 @@ Python 3 + TypeScript Web 行情原型，展示币安 BTC、ETH 的现货和 U �
 挂单按买卖方向汇总：卖单可能开空或平多，买单可能开多或平空，无法识别参与者、人数或开平仓比例。数据仅覆盖币安 ETHUSDT 的已载入价位，不包含 RPI、未触发的条件单或其他交易所；分组区间含下限、不含上限，边缘分组可能不完整。累计量从最优报价向外相加，名义金额是每个原始价位的价格乘数量后求和，不代表保证金或持仓规模。
 
 依据：[币安行情接口](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data)、[本地订单簿同步规则](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/How-to-manage-a-local-order-book-correctly)、[WebSocket 路由说明](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/Important-WebSocket-Change-Notice)。
+
+### ETH 强平估算（CoinBoss）
+
+ETH 合约的实时盘口下方显示“潜在强平买卖盘”。后端 `GET /api/markets/futures/eth/liquidations` 调用公开接口 `https://api.coinboss.com/api/liq-map?symbol=ETH&range=1d`；目前限时免费，无需 API Key，未来访问条件以供应商为准。此功能是第三方模型结果，不能标成币安真实账户的强平挂单。
+
+- 直接使用 `bins[].price`、`side` 和 `total`。`short` 表示空头潜在强平买入，`long` 表示多头潜在强平卖出；`total` 已是各杠杆组相加的仓位名义金额，不是保证金，不再乘杠杆。页面使用 USD 金额，不把它冒充 ETH 数量。
+- 与实时盘口相同，提供“价格分组”和“每侧显示”控件。强平默认按 5 USD 显示价格区间，支持原始价位及 1／5／10／25／50／100 USD 分组；低于原始档宽 `binWidth` 的选项不可用，源档宽增大时自动提升到足够大的显示分组。默认每侧展示最近 10 个非零分组，支持 20／50／全部及显示零值组。
+- 区间含下限、不含上限：按原始代表价格把完整档位归组，金额仅求和、不乘杠杆、不按比例拆分。分组只是展示口径，不推断接口未说明的源档精确边界；边缘分组可能不完整。先保留正确方向及当前价一侧的源档，再分组、累计、截取展示行数。累计从当前参考价格向外相加；汇总统计全部可用价档，不受展示行数和分组宽度影响。
+- 币安实时价格为 USDT，CoinBoss 价档为 USD，跨来源数值仅作近似定位。缺少币安价格时明确使用模型参考价；断线时标记上次价格。若原有方向的价档落到当前价另一侧，暂不计入列表并显示数量，不翻转多空方向，不据此认定已经强平，也不移动源价格档。
+- CoinBoss 官方说明模型约每 5 分钟更新。页面每 15 秒检查一次；同一后端进程的所有页面共享缓存及并发锁，15 秒内最多一次上游查询。仅在查看 ETH 页面时请求，隐藏或离开后暂停，返回后继续。此轮询独立于币安 REST 冷却和 24h 统计刷新开关。
+- `updatedAt` 用于模型年龄，成功获取旧模型不会重置其更新时间。超过 10 分钟未更新、网络失败或源数据异常时明确标记旧估算；保留上次有效快照，不把失败显示成零金额。没有成功快照时显示暂无数据。重复快照整体替换，不累计多次响应；拒绝时间倒退、异常数值和重复价档。
+- 遇到限流尊重 `Retry-After`（秒数或 HTTP 日期），失败递增退避；401／403 暂停至少 5 分钟后重试。免费状态变化会显示访问错误，不会回退到演示金额。
+
+依据：[CoinBoss API 字段和免费规则](https://www.coinboss.com/api-docs)、[模型含义与更新周期](https://www.coinboss.com/pro/futures/LiquidationMap)。文档未提供该模型的交易所筛选参数，不承诺覆盖所有 ETH 仓位；预计受影响的仓位金额不等于保证实际发生的强平成交金额。
+
+验证覆盖原始金额与累计值、并发缓存、重复快照替换、限流及失败恢复、模型陈旧与异常数据、价格越档方向、后台暂停以及移动端显示。模拟测试不访问 CoinBoss；真实接入可通过本地接口单独检查。
 
 ## Windows 本地运行
 

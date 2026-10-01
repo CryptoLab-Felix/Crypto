@@ -20,10 +20,10 @@ test("ETH depth groups prices, accumulates outward, and applies live updates", a
   await expect(asks.locator(".depth-row").first().getByRole("cell").nth(2)).toHaveText("9.000");
   await expect(asks.locator(".depth-row").last().getByRole("cell").nth(3)).toHaveText("10,000.80");
   await expect(bids.locator(".depth-row").first().getByRole("cell").nth(1)).toHaveText("4.000");
-  await page.getByRole("combobox", { name: "价格分组" }).selectOption("0.1");
+  await page.getByRole("combobox", { name: "价格分组", exact: true }).selectOption("0.1");
   await expect(asks.locator(".depth-row")).toHaveCount(3);
   await expect(asks.locator(".depth-row").last()).toContainText("2,000.10–2,000.20");
-  await page.getByRole("combobox", { name: "价格分组" }).selectOption("0");
+  await page.getByRole("combobox", { name: "价格分组", exact: true }).selectOption("0");
   mock.send({ price: "2000.25", asks: [["2000.30", "1"], ["2001.20", "4"]], bids: [["2000.20", "2"]] });
   await expect(page.getByTestId("eth-live-price")).toHaveText("2,000.25", { timeout: 1500 });
   await expect(asks.locator(".depth-row")).toHaveCount(2);

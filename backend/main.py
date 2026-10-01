@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from backend.orderbook import EthMarketStream
 from backend.binance_rest import FuturesRestGate, RestCooldownError
+from backend.liquidations import LiquidationService, LiquidationSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ async def lifespan(app: FastAPI):
             Path(__file__).resolve().parent.parent / ".local" / "futures-rest-cooldown.json"
         )
         app.state.eth_stream = EthMarketStream(client, app.state.futures_rest)
+        app.state.eth_liquidations = LiquidationService(client)
         try:
             yield
         finally:
@@ -202,6 +204,13 @@ async def eth_orderbook(websocket: WebSocket):
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+
+
+@app.get("/api/markets/futures/eth/liquidations", response_model=LiquidationSnapshot,
+         response_model_by_alias=False)
+async def eth_liquidations(request: Request, response: Response) -> LiquidationSnapshot:
+    response.headers["Cache-Control"] = "no-store"
+    return await request.app.state.eth_liquidations.snapshot()
 
 
 # The production build can run on the same Python origin as the API.

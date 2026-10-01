@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RestCooldown } from "./api";
+import EthLiquidations from "./EthLiquidations";
 import "./orderbook.css";
 
 type Level = [string, string];
@@ -177,7 +178,7 @@ export default function EthOrderBook({ onCooldown }: { onCooldown: (cooldown: Re
   const spread = snapshot?.asks.length && snapshot.bids.length ? Number(snapshot.asks[0][0]) - Number(snapshot.bids[0][0]) : null;
   const status = hidden ? "后台已暂停" : bookLive ? "盘口实时连接" : restPaused ? "盘口同步等待解除限制" : snapshot?.asks.length ? "盘口重连中 · 上次数据" : snapshot?.book_status === "reconnecting" ? "盘口连接重试中" : "正在同步盘口";
 
-  return <article className="eth-orderbook" aria-label="ETH 行情">
+  return <><article className="eth-orderbook" aria-label="ETH 行情">
     <div className="depth-heading">
       <div><span className="depth-eyebrow">ETHUSDT · 永续合约</span><h2>实时买卖挂单</h2></div>
       <div className={`depth-status ${bookLive ? "live" : "waiting"}`} role="status"><i />{status}</div>
@@ -220,5 +221,7 @@ export default function EthOrderBook({ onCooldown }: { onCooldown: (cooldown: Re
       <p>累计量从最优买卖价向外累加；名义金额为各价位价格 × 数量之和。{step > 0 && "分组区间含下限、不含上限，边缘区间仅统计已载入价位。"}</p>
       <p>币安公开挂单按价格汇总，买卖方向无法区分开仓、平仓。每侧最多载入 1000 档，不含 RPI 及未触发的条件单；盘口和最新成交价为独立更新。</p>
     </div>
-  </article>;
+  </article>
+    <EthLiquidations price={snapshot?.price ?? null} priceLive={priceLive} now={now} />
+  </>;
 }

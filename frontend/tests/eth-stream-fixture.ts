@@ -1,5 +1,6 @@
 import type { Page, WebSocketRoute } from "@playwright/test";
 import type { OrderBookSnapshot } from "../src/EthOrderBook";
+import { liquidationFixture } from "./liquidation-fixture";
 
 export const bookFixture = (price = "2000.00"): OrderBookSnapshot => ({
   symbol: "ETHUSDT", price,
@@ -11,6 +12,8 @@ export const bookFixture = (price = "2000.00"): OrderBookSnapshot => ({
 });
 
 export async function mockEthStream(page: Page, initial = bookFixture()) {
+  // Every mocked market test stays independent of public model availability.
+  await page.route("**/api/markets/futures/eth/liquidations", (route) => route.fulfill({ json: liquidationFixture() }));
   const connections: WebSocketRoute[] = [];
   const active = new Set<WebSocketRoute>();
   let state = initial;

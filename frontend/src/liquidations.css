@@ -1,0 +1,34 @@
+.eth-liquidations { margin-bottom: 30px; border: 1px solid #384050; border-radius: 12px; background: #151a22; overflow: hidden; font-variant-numeric: tabular-nums; }
+.liq-model-badge { display: inline-block; vertical-align: middle; margin-left: 6px; border: 1px solid #465375; border-radius: 4px; padding: 3px 7px; color: #afbee8; font-size: 10px; font-weight: 400; }
+.liq-intro { margin: -5px 28px 20px; color: #9ba8bb; font-size: 12px; line-height: 1.7; }
+.liq-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px 28px; border-bottom: 1px solid #28313e; background: #181e29; }
+.liq-summary > div { display: grid; gap: 8px; }
+.liq-summary span { color: #9ba8bb; font-size: 11px; }
+.liq-summary strong { font-size: 22px; font-weight: 500; }
+.liq-summary small { font-size: 10px; color: #9ba8bb; }
+.liq-buy, .liq-buy .liq-price { color: #6ad0a9; }
+.liq-sell, .liq-sell .liq-price { color: #ef939f; }
+.liq-columns, .liq-row { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 14px; padding: 0 28px; align-items: center; }
+.liq-columns { min-height: 32px; color: #8494ab; font-size: 10px; }
+.liq-row { position: relative; min-height: 29px; color: #dce3ef; font-size: 12px; }
+.liq-columns > span:not(:first-child), .liq-row > span[role="cell"]:not(:nth-child(2)) { text-align: right; }
+.liq-row > span[role="cell"] { position: relative; z-index: 1; }
+.liq-price { white-space: nowrap; }
+.liq-row:hover { background: #ffffff06; }
+.liq-fill { position: absolute; right: 0; height: calc(100% - 2px); pointer-events: none; }
+.liq-buy .liq-fill { background: #56c39b14; border-right: 2px solid #56c39b55; }
+.liq-sell .liq-fill { background: #e8758614; border-right: 2px solid #e8758655; }
+.liq-stale .liq-rows { opacity: 0.55; }
+.liq-warning { margin: 16px 28px 0; padding: 10px 12px; border-radius: 5px; background: #30291c; color: #e6bd71; font-size: 12px; line-height: 1.7; }
+.liq-zero-toggle input { accent-color: #a5b6ed; }
+.eth-liquidations .depth-notes a { color: #afbee8; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 640px) {
+  .liq-intro { margin-inline: 16px; font-size: 11px; }
+  .liq-summary { gap: 12px; padding: 16px; }
+  .liq-summary strong { font-size: 16px; }
+  .liq-columns, .liq-row { padding-inline: 12px; gap: 8px; }
+  .liq-columns { font-size: 8px; }
+  .liq-row { font-size: 10px; }
+  .liq-warning { margin-inline: 16px; font-size: 11px; }
+  .liq-current .depth-spread { max-width: 42%; }
+}
