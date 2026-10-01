@@ -1,5 +1,17 @@
 export type Market = "spot" | "futures";
 
+export interface RestCooldown {
+  http_status: 418 | 429;
+  retry_at: number;
+  message: string;
+}
+
+export class MarketRequestError extends Error {
+  constructor(message: string, public restCooldown: RestCooldown | null = null) {
+    super(message);
+  }
+}
+
 export interface Statistics {
   symbol: string;
   last_price: string;
@@ -29,6 +41,7 @@ export interface MarketSnapshot {
   fetched_at: string;
   partial: boolean;
   quotes: Quote[];
+  rest_cooldown?: RestCooldown | null;
 }
 
 export async function loadMarket(
@@ -41,14 +54,16 @@ export async function loadMarket(
   });
   if (!response.ok) {
     let message = "行情暂时无法加载，请稍后重试。";
+    let cooldown: RestCooldown | null = null;
     try {
       const body = await response.json();
       if (typeof body.detail?.message === "string")
         message = body.detail.message;
+      cooldown = body.detail?.rest_cooldown ?? null;
     } catch {
       /* A gateway may return a non-JSON error. */
     }
-    throw new Error(message);
+    throw new MarketRequestError(message, cooldown);
   }
   return response.json() as Promise<MarketSnapshot>;
 }

@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import type { Market, MarketSnapshot } from "../src/api";
+import { bookFixture, mockEthStream } from "./eth-stream-fixture";
+
+test.beforeEach(async ({ page }, info) => {
+  if (!info.tags.includes("@live")) await mockEthStream(page, bookFixture("3000.45"));
+});
 
 const fixture = (market: Market): MarketSnapshot => ({
   market,
@@ -72,7 +77,9 @@ test("live spot and futures, refresh, and mobile layout", { tag: "@live" }, asyn
     path: "../.local/futures-eth-desktop.png",
     fullPage: true,
   });
-  await page.getByRole("checkbox", { name: "每 30 秒刷新" }).uncheck();
+  await expect(page.getByText("盘口实时连接", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("eth-live-price")).toHaveText(/[\d,]+\.\d{2}/);
+  await page.getByRole("checkbox", { name: /每 30 秒刷新/ }).uncheck();
   const response = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/markets/futures") &&

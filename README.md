@@ -7,6 +7,7 @@ Python 3 + TypeScript Web 行情原型，展示币安 BTC、ETH 的现货和 U �
 - 现货、合约两个模块，均可点击切换 BTC／ETH，页面只展示选中币种的行情。两个模块默认选择 BTC，并在当前页面内分别记住所选币种。
 - 最新成交价、24 小时涨跌、最高／最低价、成交量、成交额和成交笔数。
 - 手动刷新、每 30 秒自动刷新、数据更新时间及失败／部分成功提示；后台标签页暂停轮询。
+- ETH U 本位永续增加实时盘口：卖盘、最新成交价、买盘依次排列，支持原始价位或 0.1／1／5／10 USDT 分组，每侧显示 10／20／50 档，展示挂单量、累计量及名义金额。
 - 桌面与手机布局；没有演示行情回退，页面数值来自真实公开 API。
 
 前端使用 React + TypeScript + Vite，后端使用 Python 3 + FastAPI + httpx。无需币安 API Key。当前仅展示行情，MACD、RSI 和交易操作尚未实现。
@@ -21,6 +22,28 @@ Python 3 + TypeScript Web 行情原型，展示币安 BTC、ETH 的现货和 U �
 | U 本位合约 | 24 小时行情 | `https://fapi.binance.com/fapi/v1/ticker/24hr` |
 
 每个模块使用两类 API，每次刷新为两个交易对分别请求，共四次上游 GET。后端并发请求，并通过 `/api/markets/spot`、`/api/markets/futures` 向前端提供统一结构。价格保留字符串精度，前端展示时格式化。最新价格与 24 小时统计是独立快照，可能存在轻微时间差；合约最新价不是标记价格。
+
+### ETH 合约实时盘口
+
+进入“合约市场 → ETH”即可查看，使用公开行情，无需账户或 API Key。
+
+| 数据 | 币安接口 | 更新方式 |
+|---|---|---|
+| 初始盘口 | `GET https://fapi.binance.com/fapi/v1/depth?symbol=ETHUSDT&limit=1000` | 连接及重新同步时载入每侧最多 1000 档 |
+| 盘口变化 | `wss://fstream.binance.com/public/ws/ethusdt@depth@100ms` | 100 毫秒增量推送 |
+| 最新成交价 | `wss://fstream.binance.com/market/ws/ethusdt@aggTrade` | 随聚合成交事件更新 |
+
+后端通过同源 WebSocket `/api/markets/futures/eth/orderbook` 转发行情。同一个后端进程的多个页面共享上游连接；先缓冲增量、再获取快照，按 `U/u/pu` 检查连续性，挂单数量按绝对值替换，零数量删除。失联或序号断档时标记旧数据并退避重连；遇到 REST 限流尊重 `Retry-After`。只维护快照内已知的价格范围，避免把远端未知价位当成零挂单，页面明确显示实际覆盖范围。快速成交合并为最多每秒 40 帧，并只向慢客户端保留最新帧；浏览器按绘制帧更新。100 毫秒是盘口源的推送周期，端到端延迟还取决于网络。
+
+离开 ETH 合约或隐藏标签页会关闭该页面的订阅，最后一个订阅退出后释放上游连接；回来时重新同步。当前价格和盘口独立于原有 30 秒刷新，ETH 页面上的该开关只控制 24 小时统计。
+
+合约 REST 请求共用限流冷却：盘口快照、BTC／ETH 最新价和 24 小时统计任一请求收到 418／429 后，该后端停止向币安发起新的合约 REST 请求。截止时间取 `Retry-After`（秒或 HTTP 日期）与错误消息内封禁期限中较晚者；缺失时 429 等待 60 秒、418 等待 120 秒。已经发出的请求可能完成，但成功响应不会提前清除其他请求触发的冷却。到期先放行一次探测，成功后恢复正常查询。
+
+冷却状态保存在已忽略的 `.local/futures-rest-cooldown.json`，切页、隐藏、手动重连和本地后端重启均不能提前解除。页面区分“频率受限”和“出口暂时封禁”，显示北京时间重试期限及倒计时，并暂停定时、手动查询。正常连接的价格和盘口 WebSocket 持续接收更新。日志记录触发限制的接口、状态码、请求用量及重试时间；该保护适用于当前单进程后端，不能控制同一公网 IP 上其他应用的请求。
+
+挂单按买卖方向汇总：卖单可能开空或平多，买单可能开多或平空，无法识别参与者、人数或开平仓比例。数据仅覆盖币安 ETHUSDT 的已载入价位，不包含 RPI、未触发的条件单或其他交易所；分组区间含下限、不含上限，边缘分组可能不完整。累计量从最优报价向外相加，名义金额是每个原始价位的价格乘数量后求和，不代表保证金或持仓规模。
+
+依据：[币安行情接口](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data)、[本地订单簿同步规则](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/How-to-manage-a-local-order-book-correctly)、[WebSocket 路由说明](https://developers.binance.com/en/docs/products/derivatives-trading-usds-futures/websocket-market-streams/Important-WebSocket-Change-Notice)。
 
 ## Windows 本地运行
 
@@ -58,6 +81,8 @@ npm --prefix frontend run test:e2e
 ```
 
 Windows 浏览器验证默认使用已安装的 Chrome；可通过 `PLAYWRIGHT_CHANNEL` 指定其他已安装通道。其他系统默认使用 Playwright Chromium，首次运行前在 `frontend` 目录执行 `npx playwright install chromium`。浏览器验证包含真实行情、模块切换、刷新、移动端，以及使用测试专用响应模拟的失败重试、部分失败和请求竞态。
+
+盘口验证另外覆盖快照衔接、更新丢失、删除与替换、共享连接释放、分组与累计量、实时价格变化、断线和无消息超时、后台暂停恢复及移动端布局。现货和合约的真实行情测试依赖上游网络及币安限流状态。
 
 构建完成后重新启动 Python 后端，它会同时提供 `frontend/dist` 静态页面和 API，此时可访问 <http://127.0.0.1:8000>。这是本地运行配置，尚未配置公网部署。
 

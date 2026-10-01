@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -10,9 +11,12 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError, field_validator
+
+from backend.orderbook import EthMarketStream
+from backend.binance_rest import FuturesRestGate, RestCooldownError
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +81,7 @@ class MarketSnapshot(BaseModel):
     fetched_at: datetime
     partial: bool
     quotes: list[Quote]
+    rest_cooldown: dict | None = None
 
 
 @asynccontextmanager
@@ -87,20 +92,31 @@ async def lifespan(app: FastAPI):
         limits=httpx.Limits(max_connections=12, max_keepalive_connections=8),
     ) as client:
         app.state.binance_client = client
-        yield
+        app.state.futures_rest = FuturesRestGate(
+            Path(__file__).resolve().parent.parent / ".local" / "futures-rest-cooldown.json"
+        )
+        app.state.eth_stream = EthMarketStream(client, app.state.futures_rest)
+        try:
+            yield
+        finally:
+            await app.state.eth_stream.close()
 
 
 app = FastAPI(title="Crypto 行情 API", version="0.1.0", lifespan=lifespan)
 
 
-async def fetch_data(client: httpx.AsyncClient, url: str, symbol: str, model: type[Price] | type[Statistics]):
+async def fetch_data(client: httpx.AsyncClient, url: str, symbol: str, model: type[Price] | type[Statistics],
+                     rest_gate: FuturesRestGate | None = None):
     try:
-        response = await client.get(url, params={"symbol": symbol})
+        response = (await rest_gate.get(client, url, params={"symbol": symbol}) if rest_gate else
+                    await client.get(url, params={"symbol": symbol}))
         response.raise_for_status()
         data = model.model_validate(response.json())
         if data.symbol != symbol:
             raise ValueError("Unexpected symbol in upstream response")
         return data
+    except RestCooldownError as error:
+        return str(error)
     except httpx.TimeoutException:
         return "币安响应超时，请稍后重试。"
     except httpx.HTTPStatusError as error:
@@ -124,8 +140,9 @@ async def health() -> dict[str, Literal["ok"]]:
 async def market_snapshot(market: Market, request: Request) -> MarketSnapshot:
     host, price_path, stats_path = MARKETS[market]
     client = request.app.state.binance_client
+    rest_gate = request.app.state.futures_rest if market == Market.futures else None
     tasks = [
-        fetch_data(client, host + path, symbol, model)
+        fetch_data(client, host + path, symbol, model, rest_gate)
         for symbol, _, _ in ASSETS
         for path, model in ((price_path, Price), (stats_path, Statistics))
     ]
@@ -145,18 +162,46 @@ async def market_snapshot(market: Market, request: Request) -> MarketSnapshot:
             errors=errors,
         ))
 
+    cooldown = rest_gate.info() if rest_gate else None
     if all(quote.price is None and quote.statistics is None for quote in quotes):
-        raise HTTPException(status_code=502, detail={
-            "message": "暂时无法获取币安行情，请检查网络后重试。",
+        raise HTTPException(status_code=429 if cooldown else 502, detail={
+            "message": cooldown["message"] if cooldown else "暂时无法获取币安行情，请检查网络后重试。",
             "errors": {quote.symbol: quote.errors for quote in quotes},
-        })
+            "rest_cooldown": cooldown,
+        }, headers={"Retry-After": str(math.ceil(rest_gate.retry_at - rest_gate.clock()))} if cooldown else None)
     return MarketSnapshot(
         market=market,
         source="Binance Spot" if market == Market.spot else "Binance USDⓈ-M Futures",
         fetched_at=datetime.now(timezone.utc),
         partial=any(quote.errors for quote in quotes),
         quotes=quotes,
+        rest_cooldown=cooldown,
     )
+
+
+@app.websocket("/api/markets/futures/eth/orderbook")
+async def eth_orderbook(websocket: WebSocket):
+    await websocket.accept()
+    async with websocket.app.state.eth_stream.subscribe() as queue:
+        async def send():
+            while True:
+                await asyncio.wait_for(websocket.send_json(await queue.get()), timeout=5)
+
+        async def receive():
+            while True:
+                await websocket.receive_text()
+
+        tasks = [asyncio.create_task(send()), asyncio.create_task(receive())]
+        try:
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                task.result()
+        except (WebSocketDisconnect, TimeoutError, OSError):
+            pass
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 # The production build can run on the same Python origin as the API.
