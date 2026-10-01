@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $pythonPath) -or -not (Test-Path -LiteralPath $
     throw '请先按 README 安装 Python 和前端依赖。'
 }
 
-foreach ($port in @(8000, 5173)) {
+foreach ($port in @(6623, 8823)) {
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $port)
     try { $listener.Start() }
     catch { throw "端口 $port 已被占用。如为本项目旧进程，请先运行 scripts\stop.ps1。" }
@@ -18,9 +18,9 @@ foreach ($port in @(8000, 5173)) {
 }
 
 New-Item -ItemType Directory -Path $runtimePath -Force | Out-Null
-$backend = Start-Process -FilePath $pythonPath -ArgumentList @('-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', '8000') -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtimePath 'backend.log') -RedirectStandardError (Join-Path $runtimePath 'backend-error.log')
+$backend = Start-Process -FilePath $pythonPath -ArgumentList @('-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', '6623') -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtimePath 'backend.log') -RedirectStandardError (Join-Path $runtimePath 'backend-error.log')
 try {
-    $frontend = Start-Process -FilePath (Get-Command node).Source -ArgumentList @('node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5173', '--strictPort') -WorkingDirectory (Join-Path $projectRoot 'frontend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtimePath 'frontend.log') -RedirectStandardError (Join-Path $runtimePath 'frontend-error.log')
+    $frontend = Start-Process -FilePath (Get-Command node).Source -ArgumentList @('node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '8823', '--strictPort') -WorkingDirectory (Join-Path $projectRoot 'frontend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runtimePath 'frontend.log') -RedirectStandardError (Join-Path $runtimePath 'frontend-error.log')
 } catch {
     & taskkill.exe /PID $backend.Id /T /F | Out-Null
     throw
@@ -34,8 +34,8 @@ $ready = $false
 $deadline = [DateTime]::UtcNow.AddSeconds(25)
 while ([DateTime]::UtcNow -lt $deadline) {
     try {
-        $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/health' -TimeoutSec 2
-        $page = Invoke-WebRequest -Uri 'http://127.0.0.1:5173' -UseBasicParsing -TimeoutSec 2
+        $health = Invoke-RestMethod -Uri 'http://127.0.0.1:6623/api/health' -TimeoutSec 2
+        $page = Invoke-WebRequest -Uri 'http://127.0.0.1:8823' -UseBasicParsing -TimeoutSec 2
         if ($health.status -eq 'ok' -and $page.StatusCode -eq 200) { $ready = $true; break }
     } catch { Start-Sleep -Milliseconds 300 }
 }
@@ -44,10 +44,10 @@ if (-not $ready) {
     throw '服务未能正常启动，请查看 .local 中的日志。'
 }
 
-Write-Output 'Web: http://127.0.0.1:5173'
-Write-Output 'API: http://127.0.0.1:8000/docs'
+Write-Output 'Web: http://127.0.0.1:8823'
+Write-Output 'API: http://127.0.0.1:6623/docs'
 Write-Output '日志位于 .local；停止服务请运行 scripts\stop.ps1。'
 
 if ($OpenBrowser) {
-    Start-Process 'http://127.0.0.1:5173'
+    Start-Process 'http://127.0.0.1:8823'
 }

@@ -8,7 +8,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 20_000 },
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://127.0.0.1:8823",
     channel:
       process.env.PLAYWRIGHT_CHANNEL ??
       (process.platform === "win32" ? "chrome" : undefined),
