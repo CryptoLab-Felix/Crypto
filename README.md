@@ -129,6 +129,8 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 - **Backend tests**：使用 Python 3.11，按 `backend/requirements.lock.txt` 安装依赖，自动发现并运行后端 `test_*.py` 单元测试。
 - **Frontend build and browser tests**：使用 Node.js 24 和 `npm ci`，执行 TypeScript 类型检查、生产构建，再用 Playwright Chromium 验证模拟行情场景。测试自动在 `127.0.0.1:4173` 启动构建预览，结束后关闭服务，无需运行后端。
 
+前端 CI 在官方 `mcr.microsoft.com/playwright:v1.63.0-noble` 容器内运行，镜像已包含浏览器及系统依赖，无需在每次任务中通过 Ubuntu 软件源安装。镜像版本必须与 `frontend/package-lock.json` 中的 `@playwright/test` 版本一致，升级 Playwright 时同步更新工作流镜像。仍保留完整类型检查、构建及浏览器测试，以及 15 分钟任务超时。
+
 CI 浏览器配置排除标记为 `@live` 的真实行情测试，避免币安限流或网络状态影响检查结果；新增依赖真实上游的测试也应添加此标记。保留原有 `test:e2e` 命令用于完整的本地验证。CI 配置禁止提交 `test.only`，失败时在对应运行的 Artifacts 中保存 `playwright-report`（HTML 报告、失败截图和 trace），保留 7 天。
 
 本地复现 CI 检查，在仓库根目录执行：
