@@ -54,7 +54,7 @@ cd ~/Crypto
 make dev-gui
 ```
 
-`~/Crypto` 应为项目目录（也可以是指向项目实际位置的目录联接）；如果项目在其他位置，进入实际目录后执行同一命令即可。`make dev-gui` 会在后台启动前后端，等待服务就绪后自动打开浏览器；日志保存在 `.local`。停止服务执行 `make stop-dev`。两个服务的默认端口为 8000、5173，如已启动本项目，先停止再重新启动。
+`~/Crypto` 应为项目目录（也可以是指向项目实际位置的目录联接）；如果项目在其他位置，进入实际目录后执行同一命令即可。`make dev-gui` 会在后台启动前后端，等待服务就绪后自动打开浏览器；日志保存在 `.local`。停止服务执行 `make stop-dev`。两个服务的默认端口为 6623、8823，如已启动本项目，先停止再重新启动。
 
 首次配置时可通过 WinGet 安装 GNU Make，随后重新打开终端并确认 `make --version` 可用：
 
@@ -73,7 +73,7 @@ npm --prefix frontend ci
 .\scripts\dev.ps1
 ```
 
-浏览器打开 <http://127.0.0.1:5173>；后端接口文档位于 <http://127.0.0.1:8000/docs>。启动脚本将两个服务放在隐藏的后台进程中，日志位于已忽略的 `.local` 目录。停止服务：
+浏览器打开 <http://127.0.0.1:8823>；后端接口文档位于 <http://127.0.0.1:6623/docs>。启动脚本将两个服务放在隐藏的后台进程中，日志位于已忽略的 `.local` 目录。停止服务：
 
 ```powershell
 .\scripts\stop.ps1
@@ -82,11 +82,11 @@ npm --prefix frontend ci
 需要查看终端日志或在其他系统开发时，可以分别在两个终端运行（使用相应虚拟环境的 Python）：
 
 ```shell
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 6623
 npm --prefix frontend run dev
 ```
 
-后端需要访问币安公开行情域名；上游超时、限流或网络限制会显示明确错误。单次刷新部分失败时显示可用字段及失败提示；刷新整体失败时保留并标记上次成功数据。默认端口为 8000 和 5173，前端开发服务器将 `/api` 代理到后端。
+后端需要访问币安公开行情域名；上游超时、限流或网络限制会显示明确错误。单次刷新部分失败时显示可用字段及失败提示；刷新整体失败时保留并标记上次成功数据。默认端口为 6623 和 8823，前端开发服务器将 `/api` 代理到后端。
 
 ## 构建与验证
 
@@ -101,7 +101,7 @@ Windows 浏览器验证默认使用已安装的 Chrome；可通过 `PLAYWRIGHT_C
 
 盘口验证另外覆盖快照衔接、更新丢失、删除与替换、共享连接释放、分组与累计量、实时价格变化、断线和无消息超时、后台暂停恢复及移动端布局。现货和合约的真实行情测试依赖上游网络及币安限流状态。
 
-构建完成后重新启动 Python 后端，它会同时提供 `frontend/dist` 静态页面和 API，此时可访问 <http://127.0.0.1:8000>。这是本地运行配置，尚未配置公网部署。
+构建完成后重新启动 Python 后端，它会同时提供 `frontend/dist` 静态页面和 API，此时可访问 <http://127.0.0.1:6623>。这是本地运行配置，尚未配置公网部署。
 
 ## 持续集成（CI）
 
@@ -110,11 +110,11 @@ GitHub Actions 工作流位于 [`.github/workflows/ci.yml`](.github/workflows/ci
 两个任务在 Ubuntu 上并行执行：
 
 - **Backend tests**：使用 Python 3.11，按 `backend/requirements.lock.txt` 安装依赖，自动发现并运行后端 `test_*.py` 单元测试。
-- **Frontend build and browser tests**：使用 Node.js 24 和 `npm ci`，执行 TypeScript 类型检查、生产构建，再用 Playwright Chromium 验证模拟行情场景。测试自动在 `127.0.0.1:4173` 启动构建预览，结束后关闭服务，无需运行后端。
+- **Frontend build and browser tests**：使用 Node.js 24 和 `npm ci`，执行 TypeScript 类型检查、生产构建，再用 Playwright Chromium 验证模拟行情场景。测试自动在 `127.0.0.1:8823` 启动构建预览，结束后关闭服务，无需运行后端。
 
 CI 浏览器配置排除标记为 `@live` 的真实行情测试，避免币安限流或网络状态影响检查结果；新增依赖真实上游的测试也应添加此标记。保留原有 `test:e2e` 命令用于完整的本地验证。CI 配置禁止提交 `test.only`，失败时在对应运行的 Artifacts 中保存 `playwright-report`（HTML 报告、失败截图和 trace），保留 7 天。
 
-本地复现 CI 检查，在仓库根目录执行：
+本地复现 CI 检查，在仓库根目录执行。开发服务和构建预览均使用 8823 端口，运行前请先通过 `make stop-dev` 停止开发服务：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r backend\requirements.lock.txt
