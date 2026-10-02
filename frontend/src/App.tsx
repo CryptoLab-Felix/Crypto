@@ -578,7 +578,7 @@ export default function App() {
           <footer className="page-footer">
             <span>
               数据来源{" "}
-              <b>{isSpot ? "Binance Spot" : "Binance USDⓈ-M Futures"}</b>
+              <b>{isSpot ? "Binance Spot" : showEthBook ? "Binance USDⓈ-M Futures · CoinBoss 强平估算" : "Binance USDⓈ-M Futures"}</b>
             </span>
             <a
               href={

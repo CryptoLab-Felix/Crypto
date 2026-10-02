@@ -34,6 +34,11 @@ jobs:
     name: Frontend build and browser tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Keep the image version aligned with @playwright/test in package-lock.json.
+    # Browsers and OS dependencies are preinstalled; avoid apt mirror stalls.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
     defaults:
       run:
         working-directory: frontend
@@ -48,8 +53,6 @@ jobs:
         run: npm ci
       - name: Check types and build
         run: npm run build
-      - name: Install Chromium
-        run: npx playwright install --with-deps --only-shell chromium
       - name: Run browser tests with mock data
         run: npm run test:e2e:ci
       - name: Upload browser test failure report
